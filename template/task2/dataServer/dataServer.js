@@ -93,7 +93,7 @@ function main() {
             console.error('Error binding server:', error);
             return;
         }
-        console.log(`Data server listening on port//${port}`);
+        console.log(`Data server listening on port ${port}`);
     });
 }
 
