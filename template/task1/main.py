@@ -1,103 +1,123 @@
+"""Calculate vector clocks and reconstruct their causal DAG (Task 1)."""
+
+import argparse
 import json
-import os
-import copy
+from pathlib import Path
 
-def load_graph():
-    with open('./FDS/template/task1/data.json', 'r') as f:
-        graph = json.load(f)
 
-    return graph
+def load_graph(path=None):
+    path = Path(path) if path is not None else Path(__file__).with_name("data.json")
+    with path.open(encoding="utf-8") as source:
+        return json.load(source)
 
 
 def calculate_vector_clocks(graph):
-    vector_clocks = {}
-    branches = list(graph.keys())
-    total_commits = sum(len(commits) for commits in graph.values())
-
-    while len(vector_clocks) < total_commits:
-
-        for branch_name, commits in graph.items():
-
-            for commit_name, parents in commits.items():
-
-                if commit_name in vector_clocks:
-                    continue
-
-                if not all(parent in vector_clocks for parent in parents):
-                    continue
-
-                parent_clocks = []
-
-                for parent in parents:
-                    parent_clocks.append(vector_clocks[parent])
-
-                calculated_clock = [0] * len(branches)
-
-                for parent_clock in parent_clocks:
-                    for n_brnch in range(len(branches)):
-                        calculated_clock[n_brnch] = max(
-                            calculated_clock[n_brnch],
-                            parent_clock[n_brnch]
-                        )
-                branch_index = branches.index(branch_name)
-                calculated_clock[branch_index] += 1
-
-                vector_clocks[commit_name] = calculated_clock
-
-    return vector_clocks
+    """Merge parent clocks componentwise, then advance the commit's branch."""
+    if not isinstance(graph, dict):
+        raise ValueError("The graph must map branch names to commits.")
+    branches = list(graph)
+    commits = {}
+    for branch_index, (branch, branch_commits) in enumerate(graph.items()):
+        if not isinstance(branch_commits, dict):
+            raise ValueError(f"Branch {branch!r} must contain a commit dictionary.")
+        for commit, parents in branch_commits.items():
+            if commit in commits:
+                raise ValueError(f"Duplicate commit ID: {commit}")
+            if not isinstance(parents, list) or any(not isinstance(p, str) for p in parents):
+                raise ValueError(f"Parents of {commit} must be a list of commit IDs.")
+            commits[commit] = (branch_index, parents)
+    for commit, (_, parents) in commits.items():
+        missing = set(parents) - commits.keys()
+        if missing:
+            raise ValueError(f"Unknown parents of {commit}: {', '.join(sorted(missing))}")
+    clocks = {}
+    pending = dict(commits)
+    while pending:
+        ready = [commit for commit, (_, parents) in pending.items()
+                 if all(parent in clocks for parent in parents)]
+        if not ready:
+            raise ValueError("The commit graph contains a cycle.")
+        for commit in ready:
+            branch_index, parents = pending.pop(commit)
+            clock = [0] * len(branches)
+            for parent in parents:
+                clock = [max(a, b) for a, b in zip(clock, clocks[parent])]
+            clock[branch_index] += 1
+            clocks[commit] = clock
+    return clocks
 
 
 def causally_precedes(a, b):
-    # check 1
-    smaller = False
-    for i in range(len(a)):
-        if a[i] > b[i]:
-            return False
-        if a[i] < b[i]:
-            smaller = True
-    return smaller
+    """Strict vector-clock order; equal and concurrent clocks do not precede."""
+    if len(a) != len(b):
+        raise ValueError("Vector clocks must have the same number of components.")
+    return all(x <= y for x, y in zip(a, b)) and any(x < y for x, y in zip(a, b))
 
 
 def build_causal_graph(vector_clocks):
-    causal_graph = {}
-    for commit_a in vector_clocks:
-        for commit_b in vector_clocks:
-            if commit_a == commit_b:
-                continue
-            if causally_precedes(vector_clocks[commit_a], vector_clocks[commit_b]):
-                causal_graph[commit_a].append(commit_b)
-    # für jeden Commit A
-        # für jeden Commit B
-            # A != B
-            # wenn A causally_precedes B:
-                # B als Nachfolger von A speichern
-
-    return causal_graph
+    return {
+        source: [target for target, clock in vector_clocks.items()
+                 if causally_precedes(source_clock, clock)]
+        for source, source_clock in vector_clocks.items()
+    }
 
 
 def reduce_causal_graph(causal_graph):
-    reduced_graph = copy(causal_graph)
+    """Remove an edge only when another path preserves its reachability."""
+    reduced = {source: list(targets) for source, targets in causal_graph.items()}
+    for source, targets in causal_graph.items():
+        for target in targets:
+            reduced[source].remove(target)
+            pending = list(reduced[source])
+            visited = set()
+            while pending:
+                current = pending.pop()
+                if current == target:
+                    break
+                if current not in visited:
+                    visited.add(current)
+                    pending.extend(reduced.get(current, []))
+            else:
+                reduced[source].append(target)
+    return reduced
 
-    for start in causal_graph:
-        for target in causal_graph[start]:
 
-            # edge start -> target testweise entfernen
-
-            # prüfen:
-            # kann ich target trotzdem noch von start aus erreichen?
-
-            # wenn ja:
-            # edge ist redundant
-
-            # wenn nein:
-            # edge wieder hinzufügen
-
-    return reduced_graph
+def write_dot(graph, path, vector_clocks=None):
+    """Export a Graphviz graph, including isolated nodes and clock labels."""
+    lines = ["digraph causality {", "  rankdir=LR;"]
+    for commit, targets in graph.items():
+        label = commit
+        if vector_clocks is not None:
+            label += "\n" + str(vector_clocks[commit])
+        lines.append(f"  {json.dumps(commit)} [label={json.dumps(label)}];")
+        for target in targets:
+            lines.append(f"  {json.dumps(commit)} -> {json.dumps(target)};")
+    lines.append("}")
+    Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-if __name__ == '__main__':
-    graph = load_graph()
-    vector_clocks = {}
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("input", nargs="?", type=Path,
+                        default=Path(__file__).with_name("data.json"))
+    parser.add_argument("--output-dir", type=Path, default=Path("output/task1"))
+    args = parser.parse_args(argv)
+    try:
+        clocks = calculate_vector_clocks(load_graph(args.input))
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
+    causal = build_causal_graph(clocks)
+    reduced = reduce_causal_graph(causal)
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    for name, value in [("vector_clocks", clocks), ("causal_graph", causal),
+                        ("reduced_graph", reduced)]:
+        (args.output_dir / f"{name}.json").write_text(
+            json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    write_dot(causal, args.output_dir / "causal_graph.dot", clocks)
+    write_dot(reduced, args.output_dir / "reduced_graph.dot", clocks)
+    print(json.dumps(clocks, indent=2))
+    print(f"JSON results and Graphviz graphs written to {args.output_dir.resolve()}")
 
-    vector_clocks = calculate_vector_clocks(graph)
-    print(vector_clocks)
+
+if __name__ == "__main__":
+    main()
