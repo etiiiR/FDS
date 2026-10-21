@@ -8,7 +8,7 @@ import tempfile
 import unittest
 import uuid
 
-from helpers import ROOT
+from EX1.tests.helpers import ROOT
 
 HAS_GRPC = importlib.util.find_spec("grpc") is not None
 if HAS_GRPC:

@@ -7,7 +7,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from helpers import ROOT, load_task
+from EX1.tests.helpers import ROOT, load_task
 
 task = load_task(3)
 

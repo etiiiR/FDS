@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from helpers import ROOT, load_task
+from EX1.tests.helpers import ROOT, load_task
 
 task = load_task(1)
 EXAMPLE = {
