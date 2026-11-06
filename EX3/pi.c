@@ -1,14 +1,22 @@
-#!/bin/bash
-#SBATCH --job-name=pi_mpi    # The name of the job
-#SBATCH --partition=compute  # The partition of miniHPC
-#SBATCH --hint=nomultithread # Disable hardware multithreading
-#SBATCH --exclusive          # Whole nodes for this job only
-#SBATCH --time=00:10:00      # Requested execution time
-#SBATCH --nodes=4            # Requested number of nodes
-#SBATCH --ntasks-per-node=20 # Requested processes (ranks) per node
-#SBATCH --cpus-per-task=1    # Requested CPUs per process
+#include <stdio.h>
+#include <omp.h>
 
-module load openmpi/4.1.6
-srun --mpi=pmi2 --nodes=1 --ntasks=20 ./pi_mpi   # 1 node
-srun --mpi=pmi2 --nodes=2 --ntasks=40 ./pi_mpi   # 2 nodes
-srun --mpi=pmi2 --nodes=4 --ntasks=80 ./pi_mpi   # 4 nodes
+static long num_steps = 10000000000;
+
+int main(void) {
+    double x, pi, sum = 0.0;
+    double step = 1.0 / (double)num_steps;  // rectangle width
+    double start = omp_get_wtime();
+
+    for (long i = 0; i < num_steps; i++) {
+        x = (i + 0.5) * step;               // middle of interval i
+        sum = sum + 4.0 / (1.0 + x * x);    // F(x_i)
+    }
+    pi = step * sum;
+
+    double end = omp_get_wtime();
+    printf("pi = %.10f, time = %.3f s, threads = %d\n",
+           pi, end - start, omp_get_max_threads());
+    return 0;
+}
+
