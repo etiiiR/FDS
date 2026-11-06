@@ -8,5 +8,5 @@
 #SBATCH --cpus-per-task=1    # Requested CPUs per process
 
 module load openmpi/4.1.6
-srun --mpi=pmi2 ./ring 1     # message size: number of ints
+srun --mpi=pmi2 ./ring 10000000     # message size: number of ints
 
