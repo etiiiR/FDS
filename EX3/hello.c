@@ -2,8 +2,7 @@
 #include <stdio.h>
 #include <mpi.h>
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     int numranks, rankid, len;
     char hostname[MPI_MAX_PROCESSOR_NAME];
 
@@ -17,3 +16,4 @@ int main(int argc, char *argv[])
     MPI_Finalize();
     return 0;
 }
+

@@ -1,16 +1,12 @@
-#include <stdio.h>
-#include <omp.h>
+#!/bin/bash
+#SBATCH --job-name=ring      # The name of the job
+#SBATCH --partition=compute  # The partition of miniHPC
+#SBATCH --hint=nomultithread # Disable hardware multithreading
+#SBATCH --time=00:02:00      # Requested execution time
+#SBATCH --nodes=2            # Requested number of nodes
+#SBATCH --ntasks-per-node=2  # Requested processes (ranks) per node
+#SBATCH --cpus-per-task=1    # Requested CPUs per process
 
-int main(void) {
-    printf("inside parallel region? %d\n", omp_in_parallel());
-    printf("maximum number of threads? %d\n", omp_get_max_threads());
+module load openmpi/4.1.6
+srun --mpi=pmi2 ./ring 1     # message size: number of ints
 
-    #pragma omp parallel
-    {
-        printf("inside parallel region? %d\n", omp_in_parallel());
-        printf("my thread id: %d\n", omp_get_thread_num());
-    }
-
-    printf("all done\n");
-    return 0;
-}

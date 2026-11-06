@@ -1,18 +1,12 @@
-#define MASTER 0
-#include <stdio.h>
-#include <mpi.h>
+#!/bin/bash
+#SBATCH --job-name=hello     # The name of the job
+#SBATCH --partition=compute  # The partition of miniHPC
+#SBATCH --hint=nomultithread # Disable hardware multithreading
+#SBATCH --time=00:02:00      # Requested execution time
+#SBATCH --nodes=2            # Requested number of nodes
+#SBATCH --ntasks-per-node=2  # Requested processes (ranks) per node
+#SBATCH --cpus-per-task=1    # Requested CPUs per process
 
-int main(int argc, char *argv[]) {
-    int numranks, rankid, len;
-    char hostname[MPI_MAX_PROCESSOR_NAME];
+module load openmpi/4.1.6
+srun --mpi=pmi2 ./hello
 
-    MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &numranks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rankid);
-    MPI_Get_processor_name(hostname, &len);
-    printf("Hello from rank %d on %s\n", rankid, hostname);
-    if (rankid == MASTER)
-        printf("MASTER: Number of MPI ranks is: %d\n", numranks);
-    MPI_Finalize();
-    return 0;
-}
