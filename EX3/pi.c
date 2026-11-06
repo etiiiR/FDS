@@ -8,7 +8,7 @@ int main(void) {
     double step = 1.0 / (double)num_steps;  // rectangle width
     double start = omp_get_wtime();
 
-    #pragma omp parallel for reduction(+:sum)
+    #pragma omp parallel for reduction(+:sum) private(x)
     for (long i = 0; i < num_steps; i++) {
         x = (i + 0.5) * step;               // middle of interval i
         sum = sum + 4.0 / (1.0 + x * x);    // F(x_i)
